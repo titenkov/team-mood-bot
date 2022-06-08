@@ -1,0 +1,5 @@
+name = "team-mood-bot"
+main = "src/index.js"
+compatibility_date = "2022-06-04"
+kv_namespaces = [{binding="KV_TEAM_MOOD_BOT", id="79c5a331f9ce416a811a6f590d130e20", preview_id = "8417b309798e4548aa794e67d70eb734"}]
+node_compat = true
