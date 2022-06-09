@@ -3,8 +3,8 @@ import { formatSlackMessage, formatInteractiveSetupMessage, formatInteractiveUse
 
 /**
  * Handles the incoming slack requests
- * @param {*} request 
- * @returns 
+ * @param {*} request
+ * @returns
  */
 export const handleSlackRequest = async (request) => {
   const data = qs.parse(await request.text())
@@ -102,15 +102,15 @@ const processWebhookCall = async (payload) => {
 
     return formatSlackMessage(message);
   }
-  
+
   console.info(`💫 [${team.id}] ${user.id} (${user.name}) is registering new team. Members ${members}. Administrators: ${administrators}`)
 
   const data = {
-    config: { 
+    config: {
       members: members,
       administrators: administrators
     },
-    organization: { 
+    organization: {
       id: team.id,
       domain: team.domain
     },
@@ -138,9 +138,9 @@ const handleSetup = async (data) => {
     console.error(`[setup] Unexpected missing team_id in slack request ${data}`)
     return
   }
-  
+
   const team_config = await KV_TEAM_MOOD_BOT.get(`config_${team_id}`, { type: "json" })
-  let params = {} 
+  let params = {}
 
   if (team_config) {
     console.debug(`[setup] Found config for org ${team_id}: ${JSON.stringify(team_config)}`)
@@ -185,7 +185,7 @@ export const handleScheduled = async (event) => {
 
     console.info(`[scheduled] [${config.organization.id}] Found following members ${config.config.members}`)
 
-    const members = (typeof config.config.members != 'undefined' && config.config.members instanceof Array ) ? config.config.members : [config.config.members] 
+    const members = (typeof config.config.members != 'undefined' && config.config.members instanceof Array ) ? config.config.members : [config.config.members]
 
     if (!members || members.length === 0) {
       console.info(`[scheduled] [${config.organization.id}] No members to process`)
@@ -195,18 +195,24 @@ export const handleScheduled = async (event) => {
     for (const member of members) {
       console.debug(`[scheduled] [${config.organization.id}] Sending message to ${member}`)
 
-      // const message = `Hello, ${member}!`
-      const res = await fetch(`https://slack.com/api/chat.postMessage`, 
+      const token = await KV_TEAM_MOOD_BOT.get(`token_${config.organization.id}`)
+
+      if (!token) {
+        console.error(`[scheduled] [${config.organization.id}] Unexpected missing token while processing ${member}`)
+        continue
+      }
+
+      const res = await fetch(`https://slack.com/api/chat.postMessage`,
         {
           method: 'POST',
           headers: new Headers({
-            'Authorization': `Bearer ${SLACK_BOT_TOKEN}`,
+            'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
           }),
           body: JSON.stringify({ blocks: formatInteractiveUserQuestion(), channel: member }),
         }
       )
-      
+
       if(!res.ok) {
         console.debug(`[scheduled] [${config.organization.id}] Failed to notify ${member}: ${res.status}`)
       }
@@ -215,4 +221,50 @@ export const handleScheduled = async (event) => {
     }
 
   }
+}
+
+/**
+ * Handles the OAuth requests
+ * @param {*} request
+ * @returns
+ */
+export const handleAuthRequest = async (request) => {
+  const { query } = request
+
+  if (!query || !query.code) {
+    console.error(`[auth] Unexpected missing query or code in auth request`)
+    return
+  }
+
+  const data = {
+    client_id: SLACK_CLIENT_ID,
+    client_secret: SLACK_CLIENT_SECRET,
+    code: query.code,
+  }
+
+  const res = await fetch(`https://slack.com/api/oauth.v2.access`,
+    {
+      method: 'POST',
+      headers: new Headers({
+        'Content-Type': 'application/x-www-form-urlencoded',
+      }),
+      body: qs.stringify(data),
+    }
+  )
+
+  if (!res.ok) {
+    console.error(`[auth] Failed to get access token: ${res.status}`)
+    return
+  }
+
+  const json = await res.json()
+  const { team, bot_user_id, authed_user, access_token } = json
+
+  console.info(`[auth] Saving auth token for ${team.id}. Authenticated by ${authed_user.id}`)
+
+  await KV_TEAM_MOOD_BOT.put(`token_${team.id}`, access_token, {
+    metadata: { team_id: team.id, user_id: authed_user.id },
+  });
+
+  return `slack://user?team=${team.id}&id=${bot_user_id}`
 }

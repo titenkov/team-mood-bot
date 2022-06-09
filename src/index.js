@@ -10,7 +10,7 @@
 
 import { Router } from 'itty-router'
 
-import { handleSlackRequest, handleScheduled } from './handlers'
+import { handleSlackRequest, handleAuthRequest, handleScheduled } from './handlers'
 
 const router = Router()
 
@@ -18,6 +18,17 @@ router.post("/slack", async request => {
   const response = await handleSlackRequest(request);
 
   return new Response(response, { headers: { 'Content-type': 'application/json' } })
+})
+
+router.get("/callback", async request => {
+  console.info(`[redirect] New app auth request`)
+  const url = await handleAuthRequest(request);
+  return Response.redirect(url, 301)
+})
+
+router.get("/redirect", async request => {
+  console.info(`[redirect] New app installation request`)
+  return Response.redirect(`https://slack.com/oauth/v2/authorize?client_id=${SLACK_CLIENT_ID}&scope=chat:write,commands,im:write,team:read,users:read,users:read.email,im:read&user_scope=`, 302)
 })
 
 /*

@@ -7,6 +7,14 @@ you to track the mood of your teamates by asking simple questions at the end of 
 
 🌈 The concept is very simple. If you're a good manager (leader) - you care about your people. Sometimes it might be tricky to keep control of everything happening in the team, so you might want to automate a bit feedback gathering.
 
+🪄 Moodlab is going to ask your team members how do they feel at the end of each week and provide you reports.
+
+Please visit [`moodlab`](https://moodlab.pages.dev) to know more.
+
+[![Add to slack](https://platform.slack-edge.com/img/add_to_slack.png)](https://slack.com/oauth/v2/authorize?client_id=3594698470180.3624950044596&scope=chat:write,commands,im:write,team:read,users:read,users:read.email,im:read&user_scope=)
+
+## Demo
+
 ![Slack screenshot 1](docs/slack-001.png)
 
 ![Slack screenshot 2](docs/slack-002.png)
