@@ -70,13 +70,18 @@ const processWebhookCall = async (payload) => {
   if (actions[0].action_id.startsWith('feedback-')) {
     console.debug(`[webhook] Received feedback ${JSON.stringify(payload)}`)
 
-    const timestamp = new Date().toISOString()
+    const date = new Date()
+    const timestamp = date.toISOString()
+    const milliseconds = date.getTime()
 
     const data = {
-      [timestamp]: actions[0].value
+      value: actions[0].value,
+      value_string: actions[0].text.text,
+      feedback: '', // todo
+      timestamp: timestamp,
     }
 
-    await KV_TEAM_MOOD_BOT.put(`feedback_${team.id}_${user.id}`, JSON.stringify(data), {
+    await KV_TEAM_MOOD_BOT.put(`feedback_${team.id}_${user.id}_${milliseconds}`, JSON.stringify(data), {
       metadata: { org_domain: team.domain, org_id: team.id, user_id: user.id, type: 'feedback' },
     });
 
