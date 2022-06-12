@@ -9,25 +9,41 @@
  */
 
 import { Router } from 'itty-router'
-
+import { initSentry } from '@cloudflare/worker-sentry'
 import { handleSlackRequest, handleAuthRequest, handleScheduled } from './handlers'
 
 const router = Router()
 
-router.post("/slack", async request => {
-  const response = await handleSlackRequest(request);
+router.post("/slack", async (request, sentry, e) => {
+  const response = await handleSlackRequest(request, sentry, e);
 
   return new Response(response, { headers: { 'Content-type': 'application/json' } })
 })
 
-router.get("/callback", async request => {
+router.get("/callback", async (request, sentry, e) => {
   console.info(`[redirect] New app auth request`)
-  const url = await handleAuthRequest(request);
+  sentry.addBreadcrumb({
+    category: 'slack-callback',
+    message: `New app auth request`,
+    data: request,
+    level: 'info',
+  });
+  sentry.setTag('type', 'slack-auth');
+
+  const url = await handleAuthRequest(request, sentry);
   return Response.redirect(url, 301)
 })
 
-router.get("/redirect", async request => {
+router.get("/redirect", async (request, sentry) => {
   console.info(`[redirect] New app installation request`)
+  sentry.addBreadcrumb({
+    category: 'slack-redirect',
+    message: `New app installation request`,
+    data: request,
+    level: 'info',
+  });
+  sentry.setTag('type', 'slack-auth');
+
   return Response.redirect(`https://slack.com/oauth/v2/authorize?client_id=${SLACK_CLIENT_ID}&scope=chat:write,commands,im:write,team:read,users:read,users:read.email,im:read&user_scope=`, 302)
 })
 
@@ -43,12 +59,27 @@ This snippet ties our worker to the router we deifned above, all incoming reques
 are passed to the router where your routes are called and the response is sent.
 */
 addEventListener('fetch', (e) => {
-  e.respondWith(router.handle(e.request))
+  const sentry = initSentry(e);
+
+  try {
+    e.respondWith(router.handle(e.request, sentry, e))
+  } catch (ex) {
+    sentry.captureException(ex)
+    console.warn(ex)
+    return new Response("internal error", { status: 500, message: ex });
+  }
 })
 
 /*
 Listening to the CRON events
 */
-addEventListener('scheduled', event => {
-  event.waitUntil(handleScheduled(event));
-});
+addEventListener('scheduled', e => {
+  const sentry = initSentry(e);
+
+  try {
+    e.waitUntil(handleScheduled(e, sentry));
+  } catch (ex) {
+    sentry.captureException(ex)
+    console.warn(ex)
+  }
+})
